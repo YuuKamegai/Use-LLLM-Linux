@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="use-lllm-csrf-token" content="__USE_LLLM_CSRF_TOKEN__">
+  <title>Use-LLLM General</title>
+  <link rel="stylesheet" href="./vendor/katex.min.css">
+  <link rel="stylesheet" href="./static/styles.css">
+</head>
+<body>
+  <section id="setup-overlay" class="setup-overlay hidden" aria-labelledby="setup-title">
+    <div class="setup-card">
+      <span class="welcome-kicker">FIRST RUN · CHOOSE YOUR AI</span>
+      <h1 id="setup-title">Use-LLLMを準備する</h1>
+      <p>Ollamaを準備するか、Azure OpenAIをCONNECTIONSへ登録します。MCPサーバーはどちらのAIでも利用できます。</p>
+      <div class="setup-step">
+        <div><span class="setup-number">1</span><strong>Ollama</strong></div>
+        <p id="setup-ollama-status">確認中...</p>
+        <div class="setup-actions">
+          <a id="setup-ollama-download" class="button secondary" href="https://ollama.com/download/windows" target="_blank" rel="noreferrer">公式インストーラーを開く</a>
+          <button id="setup-refresh" type="button" class="button quiet">再確認</button>
+        </div>
+      </div>
+      <div class="setup-step">
+        <div><span class="setup-number">2</span><strong>会話モデル</strong></div>
+        <p>既存モデルを選ぶか、Ollamaから取得します。既定は品質優先のqwen3:14bです。</p>
+        <label>モデル名<input id="setup-model" list="setup-models" value="qwen3:14b" autocomplete="off"></label>
+        <datalist id="setup-models"></datalist>
+        <button id="setup-pull-model" type="button" class="button secondary">モデルを取得</button>
+        <div class="setup-progress" aria-live="polite"><div id="setup-progress-bar"></div></div>
+        <p id="setup-progress-label" class="muted">未開始</p>
+      </div>
+      <div class="setup-step optional-step">
+        <div><span class="setup-number">3</span><strong>MCP（任意）</strong></div>
+        <p>初期状態ではMCPサーバーを登録しません。セットアップ後の「接続と設定」から追加できます。</p>
+      </div>
+      <div class="setup-footer">
+        <span id="setup-error" class="danger-text" role="alert"></span>
+        <button id="setup-use-azure" type="button" class="button secondary">Azure OpenAIを設定</button>
+        <button id="setup-complete" type="button" class="button primary">準備を完了</button>
+      </div>
+    </div>
+  </section>
+
+  <header class="app-header">
+    <div class="brand-block">
+      <span class="brand-mark" aria-hidden="true">U</span>
+      <div>
+        <strong>Use-LLLM</strong>
+        <span>General workspace</span>
+      </div>
+    </div>
+    <div id="endpoint-banner" class="endpoint-banner" aria-live="polite">
+      <span class="pulse"></span>
+      <div><small>送信先</small><strong>確認中...</strong></div>
+    </div>
+    <nav class="header-actions" aria-label="画面切替">
+      <button id="refresh-status" class="icon-button" title="状態を更新" aria-label="状態を更新">↻</button>
+      <button id="toggle-settings" class="button secondary" aria-controls="settings-panel">接続と設定</button>
+    </nav>
+  </header>
+
+  <div class="app-shell">
+    <aside class="session-rail">
+      <div class="rail-heading">
+        <div><span class="eyebrow">LOCAL HISTORY</span><h2>チャット</h2></div>
+        <button id="new-session" class="icon-button prominent" aria-label="新しいチャット">＋</button>
+      </div>
+      <nav id="session-list" class="session-list" aria-label="チャット履歴"></nav>
+      <div class="rail-footer">
+        <div id="system-summary" class="system-summary"><span class="status-dot"></span>状態を確認中</div>
+        <p>会話とツール履歴はこのPCだけに保存されます。</p>
+      </div>
+    </aside>
+
+    <main class="conversation-panel">
+      <section id="welcome" class="welcome-state">
+        <span class="welcome-kicker">YOUR MODEL · LOCAL TOOLS</span>
+        <h1>選べるAIと、<br>ローカルの道具を。</h1>
+        <p>OllamaまたはAzure OpenAIへ相談し、このPCへ接続したMCPツールを必要なときだけ使います。書き込みや未知の操作は、あなたが確認するまで止まります。</p>
+        <div class="starter-grid">
+          <button class="starter" data-prompt="このPCで利用できるMCPツールを整理して、できることを教えてください。"><span>01</span>利用できるツールを確認</button>
+          <button class="starter" data-prompt="次の作業を安全な手順に分解してください。"><span>02</span>作業手順を相談</button>
+          <button class="starter" data-prompt="観測結果と推測を分けて説明してください。"><span>03</span>結果を慎重に解釈</button>
+        </div>
+      </section>
+
+      <section id="chat-workspace" class="chat-workspace hidden">
+        <div class="conversation-heading">
+          <div class="conversation-name"><input id="session-name" class="eyebrow session-name" aria-label="セッション名" maxlength="500" autocomplete="off"><h1 id="session-title">新しいチャット</h1></div>
+          <div class="conversation-actions"><button id="export-session" class="button quiet">html書き出し</button><button id="delete-session" class="button quiet danger-text">履歴を削除</button></div>
+        </div>
+        <div id="chat-messages" class="chat-messages" aria-live="polite"></div>
+      </section>
+
+      <footer class="composer-wrap">
+        <form id="chat-form" class="composer">
+          <div id="attachment-chips" class="attachment-chips"></div>
+          <textarea id="chat-input" rows="2" placeholder="メッセージを入力。Shift + Enterで改行" aria-label="メッセージ"></textarea>
+          <div class="composer-footer">
+            <div class="composer-meta">
+              <div id="composer-status" class="composer-status">準備完了</div>
+              <div id="context-meter" class="context-meter unknown" role="status" aria-live="polite" title="最初の応答後に推定します">
+                <span class="context-meter-dot" aria-hidden="true"></span>
+                <span id="context-meter-label">コンテキスト —</span>
+                <span class="context-meter-track" aria-hidden="true"><span id="context-meter-fill"></span></span>
+              </div>
+            </div>
+            <div>
+              <button id="cancel-chat" type="button" class="button quiet hidden">停止</button>
+              <button id="send-chat" type="submit" class="send-button" aria-label="送信">送信 <span>↑</span></button>
+            </div>
+          </div>
+        </form>
+        <p class="disclaimer">モデルの回答やツール結果は重要な判断の前に確認してください。</p>
+      </footer>
+    </main>
+
+    <aside id="settings-panel" class="settings-panel" aria-label="接続と設定">
+      <div class="settings-heading">
+        <div><span class="eyebrow">CONNECTIONS</span><h2>接続と設定</h2></div>
+        <button id="close-settings" class="icon-button" aria-label="設定を閉じる">×</button>
+      </div>
+
+      <section class="settings-section language-section">
+        <h3>表示言語 / Language</h3>
+        <div id="language-toggle" class="language-toggle" role="group" aria-label="表示言語">
+          <button type="button" data-language="ja" aria-pressed="true">日本語</button>
+          <button type="button" data-language="en" aria-pressed="false">English</button>
+        </div>
+      </section>
+      <section class="settings-section">
+        <div id="web-search-section" class="web-search-section">
+          <div class="section-title"><h3>Web検索</h3><span id="web-search-status" class="count-badge"></span></div>
+          <label class="check-row"><input id="web-search-enabled" type="checkbox">Web検索と公開ページ取得を有効化</label>
+          <p class="muted">APIキー不要 / DuckDuckGo</p>
+          <p class="muted">有効時はAIが必要に応じて検索し、検索・ページ取得を個別確認なしで実行します。検索語は検索先へ、取得URLはページの提供元へ送信されます。</p>
+          <p class="muted">MCPサーバーの外部通信許可とは独立した設定です。</p>
+          <p id="web-search-error" class="danger-text" role="status"></p>
+        </div>
+      </section>
+      <section class="settings-section">
+        <div class="section-title"><h3>AI connections</h3><button id="add-endpoint" class="mini-button">追加</button></div>
+        <div id="endpoint-list" class="connection-list"></div>
+        <form id="endpoint-form" class="settings-form hidden">
+          <input id="endpoint-original" type="hidden">
+          <label>名前<input id="endpoint-name" required placeholder="lab-server"></label>
+          <label>Provider<select id="endpoint-provider"><option value="ollama">Ollama</option><option value="azure_openai">Azure OpenAI</option></select></label>
+          <label>URL<input id="endpoint-url" required placeholder="http://127.0.0.1:11434"></label>
+          <label id="endpoint-model-label">モデル / Deployment<input id="endpoint-model" required placeholder="qwen3:14b"></label>
+          <label id="endpoint-api-key-row" class="hidden">Azure OpenAI API key<input id="endpoint-api-key" type="password" autocomplete="new-password" placeholder="編集時は空欄のままで保存済みキーを保持"></label>
+          <label id="endpoint-context-window-row" class="hidden">コンテキスト上限（任意）<input id="endpoint-context-window" type="number" min="2048" step="1" placeholder="既知モデルは自動判定"></label>
+          <label>送信許可<select id="endpoint-trust"><option value="loopback">loopbackのみ</option><option value="lan_allowed">LAN送信を明示許可</option><option value="cloud_allowed">Azureクラウド送信を許可</option></select></label>
+          <p id="endpoint-provider-help" class="muted"></p>
+          <p class="form-warning">外部接続ではプロンプトとMCPツール結果が指定先へ送信されます。API keyはブラウザへ再表示しません。</p>
+          <div class="form-actions"><button type="button" class="button quiet form-cancel">取消</button><button class="button primary">保存</button></div>
+        </form>
+      </section>
+
+      <section class="settings-section">
+        <div class="section-title"><h3>MCP servers</h3><button id="add-server" class="mini-button">追加</button></div>
+        <div id="server-list" class="connection-list"></div>
+        <form id="server-form" class="settings-form hidden">
+          <input id="server-original" type="hidden">
+          <label>プリセット<select id="server-preset"><option value="">選択しない</option><option value="filesystem">Filesystem (npx)</option><option value="github">GitHub (npx)</option><option value="http">Streamable HTTP</option></select></label>
+          <label>名前<input id="server-name" required placeholder="my-server"></label>
+          <label>Transport<select id="server-transport"><option value="stdio">stdio</option><option value="streamable_http">Streamable HTTP</option><option value="sse">SSE (legacy)</option></select></label>
+          <label>コマンド<input id="server-command" placeholder="python"></label>
+          <label>引数（1行1引数）<textarea id="server-args" rows="3" placeholder="C:\path with spaces\server.py"></textarea></label>
+          <label>作業フォルダ<input id="server-cwd" placeholder="C:\path"></label>
+          <label>URL<input id="server-url" placeholder="https://mcp.example.com/mcp"></label>
+          <label>認証<select id="server-auth"><option value="none">なし / header</option><option value="oauth">OAuth 2.1</option></select></label>
+          <label>環境変数（KEY=VALUE、1行1件）<textarea id="server-env" rows="3"></textarea></label>
+          <label>HTTP headers（KEY=VALUE、1行1件）<textarea id="server-headers" rows="3"></textarea></label>
+          <label class="check-row"><input id="server-autostart" type="checkbox">起動時に接続を試す</label>
+          <label class="check-row"><input id="server-readonly" type="checkbox">確定read-onlyツールを自動実行</label>
+          <label class="check-row"><input id="server-network" type="checkbox">外部通信ツールを許可（全セッション）</label>
+          <p class="form-warning">未知・書き込み・外部通信ツールは、この設定に関係なく実行前に確認します。外部通信ツールは、許可しない限り実行できません。</p>
+          <div class="form-actions"><button type="button" class="button quiet form-cancel">取消</button><button class="button primary">保存</button></div>
+        </form>
+      </section>
+
+      <section class="settings-section tools-section">
+        <div class="section-title"><h3>Connected tools</h3><span id="tool-count" class="count-badge">0</span></div>
+        <p class="muted">衝突を避けるため server::tool 形式で表示します。</p>
+        <div id="tool-list" class="tool-list"><p class="muted">MCPサーバーを接続すると表示されます。</p></div>
+      </section>
+
+      <section class="settings-section">
+        <div class="section-title"><h3>Knowledge</h3><label class="mini-button file-button">ファイル追加<input id="knowledge-file" type="file" multiple></label></div>
+        <p class="muted">5MB以下のテキスト資料をローカル保存し、選択した資料だけを会話へ添付します。</p>
+        <input id="knowledge-search" class="panel-search" placeholder="資料を検索">
+        <div id="knowledge-list" class="connection-list"></div>
+      </section>
+
+      <section class="settings-section">
+        <div class="section-title"><h3>MCP Resources / Prompts</h3><button id="refresh-capabilities" class="mini-button">更新</button></div>
+        <div id="resource-list" class="connection-list"></div>
+        <div id="prompt-list" class="connection-list"></div>
+      </section>
+
+      <section class="settings-section">
+        <div class="section-title"><h3>Claude Desktopから取込</h3><button id="import-claude" class="mini-button">取込</button></div>
+        <textarea id="claude-config" class="panel-textarea" rows="5" placeholder='{"mcpServers": {...}}'></textarea>
+      </section>
+    </aside>
+  </div>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script src="./vendor/plotly.min.js"></script>
+  <script src="./vendor/katex.min.js"></script>
+  <script src="./static/i18n.js"></script>
+  <script src="./static/pca-plot.js"></script>
+  <script src="./static/eic-plot.js"></script>
+  <script src="./static/volcano-plot.js"></script>
+  <script src="./static/markdown.js"></script>
+  <script src="./static/artifact-renderer.js"></script>
+  <script src="./static/resizable-frame.js"></script>
+  <script src="./static/app.js"></script>
+</body>
+</html>

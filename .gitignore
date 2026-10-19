@@ -1,0 +1,23 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.ruff_cache/
+launcher/**/bin/
+launcher/**/obj/
+launcher/**/publish/
+installer/**/bin/
+installer/**/obj/
+build/
+dist/
+
+# Local execution records and private configuration
+.superpowers/
+.codex/
+.env
+.env.*
+settings.json
+setup.json
+*.sqlite3
+*.sqlite3-*
